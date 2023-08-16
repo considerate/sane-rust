@@ -107,12 +107,8 @@ fn align_array<T: Clone>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, P
 
 pub fn read_sane(file: File) -> Result<Sane, ParseError> {
     let (header, mut file) = read_header(file)?;
-    let mut sane_data = vec![];
-    let bytes_read = file.read_to_end(&mut sane_data).map_err(ParseError::ReadError)?;
-    if bytes_read < header.data_length {
-        Err(ParseError::NotEnoughData(header.data_length, bytes_read))?;
-    }
-    // TODO: check bytes_read is (at least) the expected number of bytes?
+    let mut sane_data = vec![0u8; header.data_length];
+    file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
     let dims: IxDyn = IxDyn(&header.shape);
     match header.data_type {
         DataType::F32 => align_array(dims, sane_data).map(Sane::ArrayF32),

@@ -3,6 +3,7 @@ use std::io::prelude::{Read, Write};
 use std::mem::size_of;
 use std::num::TryFromIntError;
 use std::slice::from_raw_parts;
+use std::error::Error;
 
 use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension};
 use quickcheck::{Arbitrary, Gen, quickcheck};
@@ -230,6 +231,7 @@ impl SaneData for u8 {
     }
 }
 
+#[derive(Debug)]
 pub enum WriteError {
     Failed(std::io::Error),
     ShapeTooLong(<u32 as TryFrom<usize>>::Error),
@@ -237,7 +239,25 @@ pub enum WriteError {
     TooMuchData(<u64 as TryFrom<usize>>::Error),
 }
 
-pub fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: Array<A, D>)  -> Result<(), WriteError> {
+impl std::fmt::Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use WriteError::*;
+        match self {
+            Failed(e) => write!(f, "Failed to write {}", e),
+            ShapeTooLong(e) => write!(f, "Shape length doesn't fit in 32 bits {}", e),
+            DimTooLarge(e) => write!(f, "Dimension size doesn't fit in 64 bits {}", e),
+            TooMuchData(e) => write!(f, "Length of array doesn't fit in 64 bits {}", e),
+        }
+    }
+}
+
+impl Error for WriteError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>)  -> Result<(), WriteError> {
     let shape = array.shape();
     let data_type = A::sane_data_type();
     let magic = "SANE".as_bytes();

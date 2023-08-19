@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io::prelude::{Read, Write};
 use std::mem::size_of;
 use std::num::TryFromIntError;
@@ -6,7 +5,7 @@ use std::slice::from_raw_parts;
 use std::error::Error;
 
 use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension};
-use quickcheck::{Arbitrary, Gen, quickcheck};
+use quickcheck::{Arbitrary, Gen};
 
 #[derive(Debug)]
 #[derive(Clone)]
@@ -75,6 +74,7 @@ struct Header {
     data_length: usize,
 }
 
+#[derive(Debug)]
 pub enum ParseError {
     NotSANE,
     InvalidDataType(u8),
@@ -93,7 +93,7 @@ fn parse_u64_size(bytes: [u8; 8]) -> Result<usize, ParseError> {
     usize::try_from(u64::from_le_bytes(bytes)).map_err(ParseError::CannotConvertToUSize)
 }
 
-fn read_header(mut file: File) -> Result<(Header, File), ParseError> {
+fn read_header<F: Read>(mut file: F) -> Result<(Header, F), ParseError> {
     let mut magic_bytes = [0; 4];
     file.read_exact(&mut magic_bytes).map_err(ParseError::NotEnoughBytes)?;
     let sane_bytes = "SANE".as_bytes();
@@ -135,7 +135,7 @@ fn align_array<T: Clone>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, P
 }
 
 
-pub fn read_sane(file: File) -> Result<(Sane, File), ParseError> {
+pub fn read_sane<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
     let (header, mut file) = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
@@ -257,7 +257,7 @@ impl Error for WriteError {
     }
 }
 
-fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>)  -> Result<(), WriteError> {
+fn write_header<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array<A, D>)  -> Result<(), WriteError> {
     let shape = array.shape();
     let data_type = A::sane_data_type();
     let magic = "SANE".as_bytes();
@@ -279,7 +279,7 @@ fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>)
     Ok(())
 }
 
-fn write_data<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>) -> Result<(), WriteError> {
+fn write_data<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array<A, D>) -> Result<(), WriteError> {
     let data_ptr = array.as_ptr();
     let byte_length = array.len() * size_of::<A>();
     if cfg!(endianness = "little") {
@@ -295,15 +295,18 @@ fn write_data<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>) -
     Ok(())
 }
 
-pub fn write_sane<A: SaneData,D: Dimension>(mut file: File, array: Array<A, D>) -> Result<(), WriteError> {
+pub fn write_sane<F: Write, A: SaneData,D: Dimension>(mut file: F, array: Array<A, D>) -> Result<(), WriteError> {
     write_header(&mut file, &array)?;
     write_data(&mut file, &array)?;
     Ok(())
 }
 
 #[cfg(test)]
-extern crate quickcheck;
 mod tests {
+    extern crate quickcheck;
+    use quickcheck::quickcheck;
+    use std::io::Cursor;
+
     use super::*;
 
     quickcheck! {
@@ -313,8 +316,16 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
-        assert_eq!(4, 4);
+    fn example_roundtrip() {
+        let arr = ndarray::array![[1,2,3], [4,5,6]];
+        let mut file = Cursor::new(Vec::new());
+        write_sane(&mut file, arr.clone()).unwrap();
+        file.set_position(0);
+        let (parsed, _) = read_sane(file).unwrap();
+        match parsed {
+            Sane::ArrayI32(arr2) => assert_eq!(arr.into_dyn(), arr2),
+            _ => assert!(false),
+        }
     }
 
 }

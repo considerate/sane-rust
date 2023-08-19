@@ -111,6 +111,7 @@ fn read_header(mut file: File) -> Result<(Header, File), ParseError> {
         let dimension = parse_u64_size(dim_bytes)?;
         shape.push(dimension);
     }
+    shape.reverse();
     let mut data_type_bytes = [0; 1];
     file.read_exact(&mut data_type_bytes).map_err(ParseError::NotEnoughBytes)?;
     let data_type = get_data_type(data_type_bytes[0]).map_err(ParseError::InvalidDataType)?;
@@ -244,7 +245,7 @@ pub fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: Array<A, 
     let shape_length = u32::try_from(shape.len()).map_err(WriteError::ShapeTooLong)?;
     let shape_length_bytes = shape_length.to_le_bytes();
     file.write_all(&shape_length_bytes).map_err(WriteError::Failed)?;
-    for &dim in shape.iter() {
+    for &dim in shape.iter().rev() {
         let dimension = u64::try_from(dim).map_err(WriteError::DimTooLarge)?;
         let dim_bytes = dimension.to_le_bytes();
         file.write_all(&dim_bytes).map_err(WriteError::Failed)?
@@ -255,7 +256,12 @@ pub fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: Array<A, 
     let data_length = u64::try_from(byte_length).map_err(WriteError::TooMuchData)?;
     let data_length_bytes = data_length.to_le_bytes();
     file.write_all(&data_length_bytes).map_err(WriteError::Failed)?;
+    Ok(())
+}
+
+fn write_data<A: SaneData, D: Dimension>(file: &mut File, array: &Array<A, D>) -> Result<(), WriteError> {
     let data_ptr = array.as_ptr();
+    let byte_length = array.len() * size_of::<A>();
     if cfg!(endianness = "little") {
         let data_ptr_bytes = data_ptr.cast::<u8>();
         let data_bytes = unsafe { from_raw_parts(data_ptr_bytes, byte_length) };
@@ -270,7 +276,8 @@ pub fn write_header<A: SaneData, D: Dimension>(file: &mut File, array: Array<A, 
 }
 
 pub fn write_sane<A: SaneData,D: Dimension>(mut file: File, array: Array<A, D>) -> Result<(), WriteError> {
-    write_header(&mut file, array)?;
+    write_header(&mut file, &array)?;
+    write_data(&mut file, &array)?;
     Ok(())
 }
 

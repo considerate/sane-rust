@@ -4,7 +4,7 @@ use std::num::TryFromIntError;
 use std::slice::from_raw_parts;
 use std::error::Error;
 
-use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension};
+use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension, ShapeError};
 use quickcheck::{Arbitrary, Gen};
 
 #[derive(Debug)]
@@ -83,6 +83,8 @@ pub enum ParseError {
     ReadError(std::io::Error),
     ShapeError(ndarray::ShapeError),
     NotEnoughData(usize, usize),
+    WrongDataType(DataType),
+    WrongShape(ShapeError),
 }
 
 fn parse_u32_size(bytes: [u8; 4]) -> Result<usize, ParseError> {
@@ -134,8 +136,29 @@ fn align_array<T: Clone>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, P
     Ok(array_view.to_owned())
 }
 
+fn align_array_shape<T: Clone, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u8>) -> Result<Array<T,D>, ParseError> {
+    let dyn_dims = IxDyn(&shape);
+    let values = unsafe {
+        byte_data.align_to::<T>().1
+    };
+    let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
+    let shaped_array = array_view.into_dimensionality().map_err(ParseError::WrongShape)?;
+    Ok(shaped_array.to_owned())
+}
 
-pub fn read_sane<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
+pub fn read_sane<F: Read, A: SaneData, D: Dimension>(file: F) -> Result<(Array<A, D>, F), ParseError> {
+    let (header, mut file) = read_header(file)?;
+    let mut sane_data = vec![0u8; header.data_length];
+    file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
+    if header.data_type != A::sane_data_type() {
+        Err(ParseError::WrongDataType(header.data_type))?;
+    }
+    let sane = align_array_shape(header.shape, sane_data)?;
+    Ok((sane, file))
+}
+
+
+pub fn read_sane_dyn<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
     let (header, mut file) = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
@@ -321,10 +344,35 @@ mod tests {
         let mut file = Cursor::new(Vec::new());
         write_sane(&mut file, arr.clone()).unwrap();
         file.set_position(0);
-        let (parsed, _) = read_sane(file).unwrap();
+        let (parsed, _) = read_sane_dyn(file).unwrap();
         match parsed {
             Sane::ArrayI32(arr2) => assert_eq!(arr.into_dyn(), arr2),
             _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn example_roundtrip_typed() {
+        let arr = ndarray::array![[1,2,3], [4,5,6]];
+        let mut file = Cursor::new(Vec::new());
+        write_sane(&mut file, arr.clone()).unwrap();
+        file.set_position(0);
+        let (arr2, _) = read_sane(file).unwrap();
+        assert_eq!(arr, arr2)
+    }
+
+    #[test]
+    fn example_roundtrip_typed_wrong_shape() {
+        let arr = ndarray::array![[1,2,3], [4,5,6]];
+        let wrong = ndarray::array![[[1,2,3], [4,5,6]]];
+        let mut file = Cursor::new(Vec::new());
+        write_sane(&mut file, arr.clone()).unwrap();
+        file.set_position(0);
+        match read_sane(file) {
+            Ok((actual, _)) => assert_ne!(wrong, actual), // This is here to determine the expected
+                                                          // type of read_sane
+            Err(ParseError::WrongShape(_)) => assert!(true),
+            Err(_) => assert!(false),
         }
     }
 

@@ -207,6 +207,21 @@ pub trait SaneData: Copy {
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<Self>;
 }
 
+macro_rules! sane_from_le_bytes {
+    ($t:ty, $e:expr) => {
+        {
+            const COUNT: usize = std::mem::size_of::<$t>();
+            let elems = $e.len() / COUNT;
+            let mut result = vec![];
+            for i in 0..elems {
+                let elem_bytes: [u8; COUNT] = $e[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+                result.push(<$t>::from_le_bytes(elem_bytes));
+            };
+            result
+        }
+    }
+}
+
 impl SaneData for f32 {
     fn sane_data_type()  -> DataType {
         DataType::F32
@@ -215,14 +230,7 @@ impl SaneData for f32 {
         f32::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<f32> {
-        const COUNT: usize = std::mem::size_of::<f32>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(f32::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(f32, bytes);
     }
 }
 
@@ -234,14 +242,7 @@ impl SaneData for i32 {
         i32::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<i32> {
-        const COUNT: usize = std::mem::size_of::<i32>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(i32::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(i32, bytes);
     }
 }
 
@@ -253,14 +254,7 @@ impl SaneData for u32 {
         u32::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<u32> {
-        const COUNT: usize = std::mem::size_of::<u32>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(u32::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(u32, bytes);
     }
 }
 
@@ -272,14 +266,7 @@ impl SaneData for f64 {
         f64::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<f64> {
-        const COUNT: usize = std::mem::size_of::<f64>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(f64::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(f64, bytes);
     }
 }
 
@@ -291,14 +278,7 @@ impl SaneData for i64 {
         i64::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<i64> {
-        const COUNT: usize = std::mem::size_of::<i64>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(i64::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(i64, bytes);
     }
 }
 
@@ -310,14 +290,7 @@ impl SaneData for u64 {
         u64::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<u64> {
-        const COUNT: usize = std::mem::size_of::<u64>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(u64::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(u64, bytes);
     }
 }
 
@@ -329,14 +302,7 @@ impl SaneData for i8 {
         i8::to_le_bytes(elem).to_vec()
     }
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<i8> {
-        const COUNT: usize = std::mem::size_of::<i8>();
-        let elems = bytes.len() / COUNT;
-        let mut result = vec![];
-        for i in 0..elems {
-            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
-            result.push(i8::from_le_bytes(elem_bytes))
-        }
-        return result
+        return sane_from_le_bytes!(i8, bytes);
     }
 }
 

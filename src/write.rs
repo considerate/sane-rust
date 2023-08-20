@@ -7,6 +7,8 @@ use ndarray::{Array, Dimension};
 
 use crate::data::{SaneData, data_type_code};
 
+/// To be able to write SANE data we need to be able to
+/// convert an element to a byte sequence
 pub trait WriteSane: SaneData {
     fn to_le_bytes(elem: Self) -> Vec<u8>;
 }
@@ -123,7 +125,8 @@ fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<
     Ok(())
 }
 
-pub fn write_sane<F: Write, A: WriteSane,D: Dimension>(mut file: F, array: Array<A, D>) -> Result<(), WriteError> {
+/// Write array into a SANE-encoded file
+pub fn write_sane<F: Write, A: WriteSane, D: Dimension>(mut file: F, array: Array<A, D>) -> Result<(), WriteError> {
     write_header(&mut file, &array)?;
     write_data(&mut file, &array)?;
     Ok(())

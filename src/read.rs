@@ -4,6 +4,9 @@ use std::num::TryFromIntError;
 use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension, ShapeError};
 use crate::data::{DataType, SaneData, Sane, Header, get_data_type};
 
+// This cannot be written as a generic function because
+// `std::mem::size_of::<T>()` cannot be called for a generic `T`,
+// despite having a `T: Sized` constraint.
 macro_rules! sane_from_le_bytes {
     ($t:ty, $e:expr) => {
         {
@@ -19,6 +22,8 @@ macro_rules! sane_from_le_bytes {
     }
 }
 
+/// To be able read SANE-encoded data we need to be able convert the `Vec<u8>` of little-endian
+/// data to the corresponding vector of values
 pub trait ReadSane: SaneData {
     fn from_le_bytes(bytes: Vec<u8>) -> Vec<Self>;
 }
@@ -139,8 +144,10 @@ fn read_header<F: Read>(file: &mut F) -> Result<Header, ParseError> {
     })
 }
 
-fn align_array<T: ReadSane>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, ParseError> {
+fn read_array<T: ReadSane>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, ParseError> {
     if cfg!(endianness = "little") {
+        // If we're on a little-endian system we can just cast the bytes to our type
+        // as the SANE spec guarantees that the data is in little-endian byte order
         let values = unsafe {
             byte_data.align_to::<T>().1
         };
@@ -153,10 +160,12 @@ fn align_array<T: ReadSane>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>
     }
 }
 
-fn align_array_shape<T: ReadSane, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u8>) -> Result<Array<T,D>, ParseError> {
+fn read_array_with_shape<T: ReadSane, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u8>) -> Result<Array<T,D>, ParseError> {
     let dyn_dims = IxDyn(&shape);
     if cfg!(endianness = "little") {
         let values = unsafe {
+            // If we're on a little-endian system we can just cast the bytes to our type
+            // as the SANE spec guarantees that the data is in little-endian byte order
             byte_data.align_to::<T>().1
         };
         let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
@@ -170,32 +179,36 @@ fn align_array_shape<T: ReadSane, D: Dimension>(shape: Vec<usize>, byte_data: Ve
     }
 }
 
-pub fn read_sane<F: Read, A: ReadSane, D: Dimension>(file: &mut F) -> Result<Array<A, D>, ParseError> {
+/// Parse a SANE-encoded file into an array with known type and rank
+pub fn read_sane<F: Read, A: ReadSane, D: Dimension>(
+    file: &mut F,
+) -> Result<Array<A, D>, ParseError> {
     let header = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
     if header.data_type != A::sane_data_type() {
         Err(ParseError::WrongDataType(header.data_type))?;
     }
-    let sane = align_array_shape(header.shape, sane_data)?;
+    let sane = read_array_with_shape(header.shape, sane_data)?;
     Ok(sane)
 }
 
 
+/// Parse a SANE-encoded file into an array with dynamic type and rank
 pub fn read_sane_dyn<F: Read>(file: &mut F) -> Result<Sane, ParseError> {
     let header = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
     let dims: IxDyn = IxDyn(&header.shape);
     let sane = match header.data_type {
-        DataType::F32 => align_array(dims, sane_data).map(Sane::ArrayF32),
-        DataType::I32 => align_array(dims, sane_data).map(Sane::ArrayI32),
-        DataType::U32 => align_array(dims, sane_data).map(Sane::ArrayU32),
-        DataType::F64 => align_array(dims, sane_data).map(Sane::ArrayF64),
-        DataType::I64 => align_array(dims, sane_data).map(Sane::ArrayI64),
-        DataType::U64 => align_array(dims, sane_data).map(Sane::ArrayU64),
-        DataType::I8 => align_array(dims, sane_data).map(Sane::ArrayI8),
-        DataType::U8 => align_array(dims, sane_data).map(Sane::ArrayU8),
+        DataType::F32 => read_array(dims, sane_data).map(Sane::ArrayF32),
+        DataType::I32 => read_array(dims, sane_data).map(Sane::ArrayI32),
+        DataType::U32 => read_array(dims, sane_data).map(Sane::ArrayU32),
+        DataType::F64 => read_array(dims, sane_data).map(Sane::ArrayF64),
+        DataType::I64 => read_array(dims, sane_data).map(Sane::ArrayI64),
+        DataType::U64 => read_array(dims, sane_data).map(Sane::ArrayU64),
+        DataType::I8 => read_array(dims, sane_data).map(Sane::ArrayI8),
+        DataType::U8 => read_array(dims, sane_data).map(Sane::ArrayU8),
     }?;
     Ok(sane)
 }

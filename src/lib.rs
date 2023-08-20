@@ -1,3 +1,7 @@
+//! Read and write SANE-encoded arrays
+//!
+//! This is an implementation of the Simple Array of Numbers Encoding (SANE) specification at:
+//! <https://github.com/considerate/sane>
 mod write;
 mod read;
 mod data;

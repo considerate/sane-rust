@@ -139,22 +139,35 @@ fn read_header<F: Read>(mut file: F) -> Result<(Header, F), ParseError> {
     }, file))
 }
 
-fn align_array<T: Clone>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, ParseError> {
-    let values = unsafe {
-        byte_data.align_to::<T>().1
-    };
-    let array_view = ArrayView::from_shape(dims, &values).map_err(ParseError::ShapeError)?;
-    Ok(array_view.to_owned())
+fn align_array<T: SaneData>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, ParseError> {
+    if cfg!(endianness = "little") {
+        let values = unsafe {
+            byte_data.align_to::<T>().1
+        };
+        let array_view = ArrayView::from_shape(dims, &values).map_err(ParseError::ShapeError)?;
+        Ok(array_view.to_owned())
+    } else {
+        let vec = T::from_le_bytes(byte_data);
+        let array_view = ArrayView::from_shape(dims, &vec).map_err(ParseError::ShapeError)?;
+        Ok(array_view.to_owned())
+    }
 }
 
-fn align_array_shape<T: Clone, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u8>) -> Result<Array<T,D>, ParseError> {
+fn align_array_shape<T: SaneData, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u8>) -> Result<Array<T,D>, ParseError> {
     let dyn_dims = IxDyn(&shape);
-    let values = unsafe {
-        byte_data.align_to::<T>().1
-    };
-    let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
-    let shaped_array = array_view.into_dimensionality().map_err(ParseError::ShapeError)?;
-    Ok(shaped_array.to_owned())
+    if cfg!(endianness = "little") {
+        let values = unsafe {
+            byte_data.align_to::<T>().1
+        };
+        let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
+        let shaped_array = array_view.into_dimensionality().map_err(ParseError::ShapeError)?;
+        Ok(shaped_array.to_owned())
+    } else {
+        let values = T::from_le_bytes(byte_data);
+        let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
+        let shaped_array = array_view.into_dimensionality().map_err(ParseError::ShapeError)?;
+        Ok(shaped_array.to_owned())
+    }
 }
 
 pub fn read_sane<F: Read, A: SaneData, D: Dimension>(file: F) -> Result<(Array<A, D>, F), ParseError> {
@@ -191,6 +204,7 @@ pub fn read_sane_dyn<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
 pub trait SaneData: Copy {
     fn sane_data_type() -> DataType;
     fn to_le_bytes(elem: Self) -> Vec<u8>;
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<Self>;
 }
 
 impl SaneData for f32 {
@@ -199,6 +213,16 @@ impl SaneData for f32 {
     }
     fn to_le_bytes(elem: f32) -> Vec<u8> {
         f32::to_le_bytes(elem).to_vec()
+    }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<f32> {
+        const COUNT: usize = std::mem::size_of::<f32>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(f32::from_le_bytes(elem_bytes))
+        }
+        return result
     }
 }
 
@@ -209,6 +233,16 @@ impl SaneData for i32 {
     fn to_le_bytes(elem: i32) -> Vec<u8> {
         i32::to_le_bytes(elem).to_vec()
     }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<i32> {
+        const COUNT: usize = std::mem::size_of::<i32>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(i32::from_le_bytes(elem_bytes))
+        }
+        return result
+    }
 }
 
 impl SaneData for u32 {
@@ -217,6 +251,16 @@ impl SaneData for u32 {
     }
     fn to_le_bytes(elem: u32) -> Vec<u8> {
         u32::to_le_bytes(elem).to_vec()
+    }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<u32> {
+        const COUNT: usize = std::mem::size_of::<u32>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(u32::from_le_bytes(elem_bytes))
+        }
+        return result
     }
 }
 
@@ -227,6 +271,16 @@ impl SaneData for f64 {
     fn to_le_bytes(elem: f64) -> Vec<u8> {
         f64::to_le_bytes(elem).to_vec()
     }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<f64> {
+        const COUNT: usize = std::mem::size_of::<f64>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(f64::from_le_bytes(elem_bytes))
+        }
+        return result
+    }
 }
 
 impl SaneData for i64 {
@@ -235,6 +289,16 @@ impl SaneData for i64 {
     }
     fn to_le_bytes(elem: i64) -> Vec<u8> {
         i64::to_le_bytes(elem).to_vec()
+    }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<i64> {
+        const COUNT: usize = std::mem::size_of::<i64>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(i64::from_le_bytes(elem_bytes))
+        }
+        return result
     }
 }
 
@@ -245,6 +309,16 @@ impl SaneData for u64 {
     fn to_le_bytes(elem: u64) -> Vec<u8> {
         u64::to_le_bytes(elem).to_vec()
     }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<u64> {
+        const COUNT: usize = std::mem::size_of::<u64>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(u64::from_le_bytes(elem_bytes))
+        }
+        return result
+    }
 }
 
 impl SaneData for i8 {
@@ -254,6 +328,16 @@ impl SaneData for i8 {
     fn to_le_bytes(elem: i8) -> Vec<u8> {
         i8::to_le_bytes(elem).to_vec()
     }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<i8> {
+        const COUNT: usize = std::mem::size_of::<i8>();
+        let elems = bytes.len() / COUNT;
+        let mut result = vec![];
+        for i in 0..elems {
+            let elem_bytes: [u8; COUNT] = bytes[i*COUNT..(i+1)*COUNT].try_into().unwrap();
+            result.push(i8::from_le_bytes(elem_bytes))
+        }
+        return result
+    }
 }
 
 impl SaneData for u8 {
@@ -262,6 +346,9 @@ impl SaneData for u8 {
     }
     fn to_le_bytes(elem: u8) -> Vec<u8> {
         vec![elem]
+    }
+    fn from_le_bytes(bytes: Vec<u8>) -> Vec<u8> {
+        return bytes;
     }
 }
 
@@ -386,5 +473,4 @@ mod tests {
             Err(_) => assert!(false),
         }
     }
-
 }

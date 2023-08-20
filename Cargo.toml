@@ -2,8 +2,11 @@
 name = "sane-array"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Read and write SANE-encoded multi-dimensional arrays"
+readme = "README.md"
+license-file = "LICENSE"
+homepage = "https://github.com/considerate/sane-rust"
+repository = "https://github.com/considerate/sane-rust"
 
 [dependencies]
 ndarray = "0.15.6"

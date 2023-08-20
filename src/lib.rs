@@ -22,7 +22,7 @@ mod tests {
         let mut file = Cursor::new(Vec::new());
         write_sane(&mut file, arr.clone()).unwrap();
         file.set_position(0);
-        let (parsed, _) = read_sane_dyn(file).unwrap();
+        let parsed = read_sane_dyn(&mut file).unwrap();
         match parsed {
             Sane::ArrayI32(arr2) => assert_eq!(arr.into_dyn(), arr2),
             _ => assert!(false),
@@ -35,7 +35,7 @@ mod tests {
         let mut file = Cursor::new(Vec::new());
         write_sane(&mut file, arr.clone()).unwrap();
         file.set_position(0);
-        let (arr2, _) = read_sane(file).unwrap();
+        let arr2 = read_sane(&mut file).unwrap();
         assert_eq!(arr, arr2)
     }
 
@@ -46,9 +46,8 @@ mod tests {
         let mut file = Cursor::new(Vec::new());
         write_sane(&mut file, arr.clone()).unwrap();
         file.set_position(0);
-        match read_sane(file) {
-            Ok((actual, _)) => assert_ne!(wrong, actual), // This is here to determine the expected
-                                                          // type of read_sane
+        match read_sane(&mut file) {
+            Ok(actual) => assert_ne!(wrong, actual), // This is here to determine the expected type of read_sane
             Err(ParseError::ShapeError(_)) => assert!(true),
             Err(_) => assert!(false),
         }

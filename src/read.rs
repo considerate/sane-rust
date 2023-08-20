@@ -106,7 +106,7 @@ fn parse_u64_size(bytes: [u8; 8]) -> Result<usize, ParseError> {
     usize::try_from(u64::from_le_bytes(bytes)).map_err(ParseError::CannotConvertToUSize)
 }
 
-fn read_header<F: Read>(mut file: F) -> Result<(Header, F), ParseError> {
+fn read_header<F: Read>(file: &mut F) -> Result<Header, ParseError> {
     let mut magic_bytes = [0; 4];
     file.read_exact(&mut magic_bytes).map_err(ParseError::NotEnoughBytes)?;
     let sane_bytes = "SANE".as_bytes();
@@ -132,11 +132,11 @@ fn read_header<F: Read>(mut file: F) -> Result<(Header, F), ParseError> {
     let mut data_length_bytes = [0; 8];
     file.read_exact(&mut data_length_bytes).map_err(ParseError::NotEnoughBytes)?;
     let data_length = parse_u64_size(data_length_bytes)?;
-    Ok((Header {
+    Ok(Header {
         shape,
         data_type,
         data_length,
-    }, file))
+    })
 }
 
 fn align_array<T: ReadSane>(dims: IxDyn, byte_data: Vec<u8>) -> Result<ArrayD<T>, ParseError> {
@@ -170,20 +170,20 @@ fn align_array_shape<T: ReadSane, D: Dimension>(shape: Vec<usize>, byte_data: Ve
     }
 }
 
-pub fn read_sane<F: Read, A: ReadSane, D: Dimension>(file: F) -> Result<(Array<A, D>, F), ParseError> {
-    let (header, mut file) = read_header(file)?;
+pub fn read_sane<F: Read, A: ReadSane, D: Dimension>(file: &mut F) -> Result<Array<A, D>, ParseError> {
+    let header = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
     if header.data_type != A::sane_data_type() {
         Err(ParseError::WrongDataType(header.data_type))?;
     }
     let sane = align_array_shape(header.shape, sane_data)?;
-    Ok((sane, file))
+    Ok(sane)
 }
 
 
-pub fn read_sane_dyn<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
-    let (header, mut file) = read_header(file)?;
+pub fn read_sane_dyn<F: Read>(file: &mut F) -> Result<Sane, ParseError> {
+    let header = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
     let dims: IxDyn = IxDyn(&header.shape);
@@ -197,5 +197,5 @@ pub fn read_sane_dyn<F: Read>(file: F) -> Result<(Sane, F), ParseError> {
         DataType::I8 => align_array(dims, sane_data).map(Sane::ArrayI8),
         DataType::U8 => align_array(dims, sane_data).map(Sane::ArrayU8),
     }?;
-    Ok((sane, file))
+    Ok(sane)
 }

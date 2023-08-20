@@ -1,10 +1,10 @@
 use std::fs::File;
-use sane_array::{write_sane, SaneData};
+use sane_array::{write_sane, WriteSane};
 use ndarray::{self, Dimension};
 use ndarray::array;
 use std::io::{Error, ErrorKind};
 
-fn write_sane_file<A: SaneData, D: Dimension>(path: &str, arr: ndarray::Array<A, D>)  -> Result<(), Error> {
+fn write_sane_file<A: WriteSane, D: Dimension>(path: &str, arr: ndarray::Array<A, D>)  -> Result<(), Error> {
     let file = File::create(path)?;
     write_sane(file, arr).map_err(|e| Error::new(ErrorKind::Other, e))
 }

@@ -7,9 +7,7 @@ use std::error::Error;
 use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension, ShapeError};
 use quickcheck::{Arbitrary, Gen};
 
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DataType {
     F32,
     I32,
@@ -81,10 +79,23 @@ pub enum ParseError {
     NotEnoughBytes(std::io::Error),
     CannotConvertToUSize(TryFromIntError),
     ReadError(std::io::Error),
-    ShapeError(ndarray::ShapeError),
-    NotEnoughData(usize, usize),
+    ShapeError(ShapeError),
     WrongDataType(DataType),
-    WrongShape(ShapeError),
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ParseError::*;
+        match self {
+            NotSANE => write!(f, "Not a SANE array"),
+            InvalidDataType(code) => write!(f, "Invalid data type code: {}", code),
+            NotEnoughBytes(err) => write!(f, "Not enough bytes: {}", err),
+            CannotConvertToUSize(err) => write!(f, "Cannot convert to size: {}", err),
+            ReadError(err) => write!(f, "Failed to read: {}", err),
+            ShapeError(err) => write!(f, "{}", err),
+            WrongDataType(t) => write!(f, "unexpected data type {:?}", t),
+        }
+    }
 }
 
 fn parse_u32_size(bytes: [u8; 4]) -> Result<usize, ParseError> {
@@ -142,7 +153,7 @@ fn align_array_shape<T: Clone, D: Dimension>(shape: Vec<usize>, byte_data: Vec<u
         byte_data.align_to::<T>().1
     };
     let array_view = ArrayView::from_shape(dyn_dims, &values).map_err(ParseError::ShapeError)?;
-    let shaped_array = array_view.into_dimensionality().map_err(ParseError::WrongShape)?;
+    let shaped_array = array_view.into_dimensionality().map_err(ParseError::ShapeError)?;
     Ok(shaped_array.to_owned())
 }
 
@@ -371,7 +382,7 @@ mod tests {
         match read_sane(file) {
             Ok((actual, _)) => assert_ne!(wrong, actual), // This is here to determine the expected
                                                           // type of read_sane
-            Err(ParseError::WrongShape(_)) => assert!(true),
+            Err(ParseError::ShapeError(_)) => assert!(true),
             Err(_) => assert!(false),
         }
     }

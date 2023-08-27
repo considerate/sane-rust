@@ -1,6 +1,6 @@
 [package]
 name = "sane-array"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "Read and write SANE-encoded multi-dimensional arrays"
 readme = "README.md"

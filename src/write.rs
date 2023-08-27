@@ -5,7 +5,7 @@ use std::error::Error;
 
 use ndarray::{Dimension, ArrayBase, Data};
 
-use crate::data::{SaneData, data_type_code};
+use crate::{data::{SaneData, data_type_code}, Sane};
 
 /// To be able to write SANE data we need to be able to
 /// convert an element to a byte sequence
@@ -175,6 +175,31 @@ where
 {
     for array in arrays.into_iter() {
         write_sane_io(&mut file, array)?;
+    }
+    Ok(())
+}
+
+
+/// Write multiple SANE-encoded arrays to a file, each with a dynamic shape and data type
+pub fn write_sane_arrays_dyn<'a, F: Write, Arrays>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), WriteError>
+where
+    Arrays: IntoIterator<Item = &'a Sane>
+{
+    use Sane::*;
+    for sane in arrays.into_iter() {
+        match sane {
+           ArrayF32(array) => write_sane(&mut file, array)?,
+           ArrayI32(array) => write_sane(&mut file, array)?,
+           ArrayU32(array) => write_sane(&mut file, array)?,
+           ArrayF64(array) => write_sane(&mut file, array)?,
+           ArrayI64(array) => write_sane(&mut file, array)?,
+           ArrayU64(array) => write_sane(&mut file, array)?,
+           ArrayI8(array) => write_sane(&mut file, array)?,
+           ArrayU8(array) => write_sane(&mut file, array)?,
+        }
     }
     Ok(())
 }

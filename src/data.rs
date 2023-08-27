@@ -53,6 +53,7 @@ pub fn data_type_code(data_type: DataType) -> u8 {
 
 /// A Sane array is an array with dynamic shape and elements of one of the [supported data
 /// types](https://github.com/considerate/sane#data-types)
+#[derive(Debug, Clone, PartialEq)]
 pub enum Sane {
     ArrayF32(ArrayD<f32>),
     ArrayI32(ArrayD<i32>),

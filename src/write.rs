@@ -126,8 +126,19 @@ fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<
 }
 
 /// Write array into a SANE-encoded file
-pub fn write_sane<F: Write, A: WriteSane, D: Dimension>(mut file: F, array: Array<A, D>) -> Result<(), WriteError> {
+pub fn write_sane<F: Write, A: WriteSane, D: Dimension>(mut file: F, array: &Array<A, D>) -> Result<(), WriteError> {
     write_header(&mut file, &array)?;
     write_data(&mut file, &array)?;
+    Ok(())
+}
+
+pub fn write_sane_arrays<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays>(mut file: F, arrays: Arrays) -> Result<(), WriteError>
+where
+    Arrays: IntoIterator<Item = &'a Array<A,D>>
+{
+    for array in arrays.into_iter() {
+        write_header(&mut file, &array)?;
+        write_data(&mut file, &array)?;
+    }
     Ok(())
 }

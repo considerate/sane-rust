@@ -20,7 +20,7 @@ impl Arbitrary for DataType {
     }
 }
 
-pub fn get_data_type(code: u8) -> Result<DataType, u8> {
+pub fn parse_data_type(code: u8) -> Result<DataType, u8> {
     match code {
         0 => Ok(DataType::F32),
         1 => Ok(DataType::I32),
@@ -119,11 +119,11 @@ impl SaneData for u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::{DataType, get_data_type, data_type_code};
+    use super::{DataType, parse_data_type, data_type_code};
     use quickcheck::quickcheck;
     quickcheck! {
         fn prop_data_type_round(data_type: DataType) -> bool {
-            Ok(data_type.clone()) == get_data_type(data_type_code(data_type))
+            Ok(data_type.clone()) == parse_data_type(data_type_code(data_type))
         }
     }
 }

@@ -6,8 +6,11 @@ pub mod write;
 pub mod read;
 pub mod data;
 
+#[doc(inline)]
 pub use crate::read::{read_sane, read_sane_dyn, read_sane_arrays, read_sane_arrays_dyn, ReadSane};
+#[doc(inline)]
 pub use crate::write::{write_sane, write_sane_io, write_sane_arrays, write_sane_arrays_io, write_sane_arrays_dyn, WriteSane};
+#[doc(inline)]
 pub use crate::data::{SaneData, Sane};
 
 

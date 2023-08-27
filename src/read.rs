@@ -238,7 +238,7 @@ pub fn read_sane_arrays<F: Read, A: ReadSane, D: Dimension>(
     }
 }
 
-/// Parse multiple SANE-encoded arrays each with dynamic shape and data type
+/// Parse multiple SANE-encoded arrays each with dynamic data type and rank
 pub fn read_sane_arrays_dyn<F: Read>(
     file: &mut F,
 ) -> Result<Vec<Sane>, ParseError> {

@@ -74,6 +74,8 @@ pub struct Header {
     pub data_length: usize,
 }
 
+/// An element type with the [`SaneData`] trait defines which of the [supported data
+/// types](https://github.com/considerate/sane#data-types) it corresponds to
 pub trait SaneData: Copy {
     fn sane_data_type() -> DataType;
 }

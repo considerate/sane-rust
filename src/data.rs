@@ -1,5 +1,7 @@
 use ndarray::ArrayD;
 use quickcheck::{Arbitrary, Gen};
+
+/// SANE [supported data types](https://github.com/considerate/sane#data-types)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DataType {
     F32,
@@ -20,7 +22,8 @@ impl Arbitrary for DataType {
     }
 }
 
-pub fn get_data_type(code: u8) -> Result<DataType, u8> {
+/// Parse a SANE-encoded u8 into the corresponding [`DataType`].
+pub fn parse_data_type(code: u8) -> Result<DataType, u8> {
     match code {
         0 => Ok(DataType::F32),
         1 => Ok(DataType::I32),
@@ -34,6 +37,7 @@ pub fn get_data_type(code: u8) -> Result<DataType, u8> {
     }
 }
 
+/// Get the `u8` SANE-encoding of a [`DataType`].
 pub fn data_type_code(data_type: DataType) -> u8 {
     match data_type {
         DataType::F32 => 0,
@@ -47,6 +51,9 @@ pub fn data_type_code(data_type: DataType) -> u8 {
     }
 }
 
+/// A Sane array is an array with dynamic shape and elements of one of the [supported data
+/// types](https://github.com/considerate/sane#data-types)
+#[derive(Debug, Clone, PartialEq)]
 pub enum Sane {
     ArrayF32(ArrayD<f32>),
     ArrayI32(ArrayD<i32>),
@@ -59,6 +66,8 @@ pub enum Sane {
 }
 
 
+/// The header of a SANE array, consisting of the shape, the data type and the length of the data
+/// in number of bytes
 pub struct Header {
     pub shape: Vec<usize>,
     pub data_type: DataType,
@@ -119,11 +128,11 @@ impl SaneData for u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::{DataType, get_data_type, data_type_code};
+    use super::{DataType, parse_data_type, data_type_code};
     use quickcheck::quickcheck;
     quickcheck! {
         fn prop_data_type_round(data_type: DataType) -> bool {
-            Ok(data_type.clone()) == get_data_type(data_type_code(data_type))
+            Ok(data_type.clone()) == parse_data_type(data_type_code(data_type))
         }
     }
 }

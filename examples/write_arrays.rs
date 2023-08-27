@@ -1,13 +1,22 @@
 use std::fs::File;
-use sane_array::{write_sane, WriteSane};
+use sane_array::{write_sane_io, WriteSane};
 use ndarray::{self, Dimension};
 use ndarray::array;
-use std::io::{Error, ErrorKind};
+use std::io::{Error};
+
+fn with_file<A, F>(path: &str, f: F) -> Result<A, Error>
+where
+    F : Fn(File) -> Result<A, Error> {
+    let file = File::create(path)?;
+    f(file)
+}
 
 fn write_sane_file<A: WriteSane, D: Dimension>(path: &str, arr: ndarray::Array<A, D>)  -> Result<(), Error> {
-    let file = File::create(path)?;
-    write_sane(file, arr).map_err(|e| Error::new(ErrorKind::Other, e))
+    with_file(path, |mut file| {
+        write_sane_io(&mut file, &arr)
+    })
 }
+
 
 fn main() -> std::io::Result<()> {
     write_sane_file("tests/arrays/simple.sane", array![[1,2],[3,4]])?;

@@ -1,10 +1,10 @@
 [package]
 name = "sane-array"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Read and write SANE-encoded multi-dimensional arrays"
 readme = "README.md"
-license-file = "LICENSE"
+license = "MIT"
 homepage = "https://github.com/considerate/sane-rust"
 repository = "https://github.com/considerate/sane-rust"
 

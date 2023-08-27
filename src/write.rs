@@ -3,9 +3,9 @@ use std::mem::size_of;
 use std::slice::from_raw_parts;
 use std::error::Error;
 
-use ndarray::{Array, Dimension};
+use ndarray::{Dimension, ArrayBase, Data};
 
-use crate::data::{SaneData, data_type_code};
+use crate::{data::{SaneData, data_type_code}, Sane};
 
 /// To be able to write SANE data we need to be able to
 /// convert an element to a byte sequence
@@ -87,7 +87,10 @@ impl Error for WriteError {
     }
 }
 
-fn write_header<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array<A, D>)  -> Result<(), WriteError> {
+fn write_header<F: Write, A: SaneData, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>)  -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
     let shape = array.shape();
     let data_type = A::sane_data_type();
     let magic = "SANE".as_bytes();
@@ -109,7 +112,10 @@ fn write_header<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array
     Ok(())
 }
 
-fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<A, D>) -> Result<(), WriteError> {
+fn write_data<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
     let data_ptr = array.as_ptr();
     let byte_length = array.len() * size_of::<A>();
     if cfg!(endianness = "little") {
@@ -126,8 +132,74 @@ fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<
 }
 
 /// Write array into a SANE-encoded file
-pub fn write_sane<F: Write, A: WriteSane, D: Dimension>(mut file: F, array: Array<A, D>) -> Result<(), WriteError> {
-    write_header(&mut file, &array)?;
-    write_data(&mut file, &array)?;
+pub fn write_sane<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
+    write_header(file, &array)?;
+    write_data(file, &array)?;
+    Ok(())
+}
+
+/// Write array into SANE-encoded file, returning [`std::io::Error`]s
+pub fn write_sane_io<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), std::io::Error>
+where
+    Repr: Data<Elem = A>
+{
+    write_sane(file, array).map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+}
+
+/// Write multiple SANE-encoded arrays to a file
+pub fn write_sane_arrays<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays, Repr>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A> + 'a,
+    Arrays: IntoIterator<Item = &'a ArrayBase<Repr,D>>
+{
+    for array in arrays.into_iter() {
+        write_sane(&mut file, array)?;
+    }
+    Ok(())
+}
+
+/// Write multiple SANE-encoded arrays to a file, returning [`std::io::Error`]s
+pub fn write_sane_arrays_io<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays, Repr>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), std::io::Error>
+where
+    Repr: Data<Elem = A> + 'a,
+    Arrays: IntoIterator<Item = &'a ArrayBase<Repr,D>>
+{
+    for array in arrays.into_iter() {
+        write_sane_io(&mut file, array)?;
+    }
+    Ok(())
+}
+
+
+/// Write multiple SANE-encoded arrays to a file, each with a dynamic shape and data type
+pub fn write_sane_arrays_dyn<'a, F: Write, Arrays>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), WriteError>
+where
+    Arrays: IntoIterator<Item = &'a Sane>
+{
+    use Sane::*;
+    for sane in arrays.into_iter() {
+        match sane {
+           ArrayF32(array) => write_sane(&mut file, array)?,
+           ArrayI32(array) => write_sane(&mut file, array)?,
+           ArrayU32(array) => write_sane(&mut file, array)?,
+           ArrayF64(array) => write_sane(&mut file, array)?,
+           ArrayI64(array) => write_sane(&mut file, array)?,
+           ArrayU64(array) => write_sane(&mut file, array)?,
+           ArrayI8(array) => write_sane(&mut file, array)?,
+           ArrayU8(array) => write_sane(&mut file, array)?,
+        }
+    }
     Ok(())
 }

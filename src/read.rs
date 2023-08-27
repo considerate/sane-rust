@@ -1,8 +1,8 @@
-use std::io::prelude::Read;
+use std::io::{prelude::Read, ErrorKind};
 use std::num::TryFromIntError;
 
 use ndarray::{IxDyn, ArrayView, ArrayD, Array, Dimension, ShapeError};
-use crate::data::{DataType, SaneData, Sane, Header, get_data_type};
+use crate::data::{DataType, SaneData, Sane, Header, parse_data_type};
 
 // This cannot be written as a generic function because
 // `std::mem::size_of::<T>()` cannot be called for a generic `T`,
@@ -79,6 +79,7 @@ impl ReadSane for u8 {
 
 #[derive(Debug)]
 pub enum ParseError {
+    EOF,
     NotSANE,
     InvalidDataType(u8),
     NotEnoughBytes(std::io::Error),
@@ -92,6 +93,7 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ParseError::*;
         match self {
+            EOF => write!(f, "End of file"),
             NotSANE => write!(f, "Not a SANE array"),
             InvalidDataType(code) => write!(f, "Invalid data type code: {}", code),
             NotEnoughBytes(err) => write!(f, "Not enough bytes: {}", err),
@@ -113,7 +115,12 @@ fn parse_u64_size(bytes: [u8; 8]) -> Result<usize, ParseError> {
 
 fn read_header<F: Read>(file: &mut F) -> Result<Header, ParseError> {
     let mut magic_bytes = [0; 4];
-    file.read_exact(&mut magic_bytes).map_err(ParseError::NotEnoughBytes)?;
+    file.read_exact(&mut magic_bytes).map_err(|err|
+        match err.kind() {
+            ErrorKind::UnexpectedEof => ParseError::EOF,
+            _ => ParseError::NotEnoughBytes(err),
+        }
+    )?;
     let sane_bytes = "SANE".as_bytes();
     if magic_bytes != sane_bytes {
         return Err(ParseError::NotSANE);
@@ -133,7 +140,7 @@ fn read_header<F: Read>(file: &mut F) -> Result<Header, ParseError> {
     shape.reverse();
     let mut data_type_bytes = [0; 1];
     file.read_exact(&mut data_type_bytes).map_err(ParseError::NotEnoughBytes)?;
-    let data_type = get_data_type(data_type_bytes[0]).map_err(ParseError::InvalidDataType)?;
+    let data_type = parse_data_type(data_type_bytes[0]).map_err(ParseError::InvalidDataType)?;
     let mut data_length_bytes = [0; 8];
     file.read_exact(&mut data_length_bytes).map_err(ParseError::NotEnoughBytes)?;
     let data_length = parse_u64_size(data_length_bytes)?;
@@ -195,7 +202,9 @@ pub fn read_sane<F: Read, A: ReadSane, D: Dimension>(
 
 
 /// Parse a SANE-encoded file into an array with dynamic type and rank
-pub fn read_sane_dyn<F: Read>(file: &mut F) -> Result<Sane, ParseError> {
+pub fn read_sane_dyn<F: Read>(
+    file: &mut F,
+) -> Result<Sane, ParseError> {
     let header = read_header(file)?;
     let mut sane_data = vec![0u8; header.data_length];
     file.read_exact(&mut sane_data).map_err(ParseError::NotEnoughBytes)?;
@@ -211,4 +220,36 @@ pub fn read_sane_dyn<F: Read>(file: &mut F) -> Result<Sane, ParseError> {
         DataType::U8 => read_array(dims, sane_data).map(Sane::ArrayU8),
     }?;
     Ok(sane)
+}
+
+/// Parse multiple SANE-encoded arrays from a file
+pub fn read_sane_arrays<F: Read, A: ReadSane, D: Dimension>(
+    file: &mut F,
+) -> Result<Vec<Array<A, D>>, ParseError> {
+    let mut arrays = vec![];
+    loop {
+        match read_sane(file) {
+            Ok(array) => arrays.push(array),
+            Err(e) => match e {
+                ParseError::EOF => return Ok(arrays),
+                _ => return Err(e),
+            },
+        }
+    }
+}
+
+/// Parse multiple SANE-encoded arrays each with dynamic shape and data type
+pub fn read_sane_arrays_dyn<F: Read>(
+    file: &mut F,
+) -> Result<Vec<Sane>, ParseError> {
+    let mut arrays = vec![];
+    loop {
+        match read_sane_dyn(file) {
+            Ok(array) => arrays.push(array),
+            Err(e) => match e {
+                ParseError::EOF => return Ok(arrays),
+                _ => return Err(e),
+            },
+        }
+    }
 }

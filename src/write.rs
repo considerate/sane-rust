@@ -3,7 +3,7 @@ use std::mem::size_of;
 use std::slice::from_raw_parts;
 use std::error::Error;
 
-use ndarray::{Array, Dimension};
+use ndarray::{Dimension, ArrayBase, Data};
 
 use crate::data::{SaneData, data_type_code};
 
@@ -87,7 +87,10 @@ impl Error for WriteError {
     }
 }
 
-fn write_header<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array<A, D>)  -> Result<(), WriteError> {
+fn write_header<F: Write, A: SaneData, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>)  -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
     let shape = array.shape();
     let data_type = A::sane_data_type();
     let magic = "SANE".as_bytes();
@@ -109,7 +112,10 @@ fn write_header<F: Write, A: SaneData, D: Dimension>(file: &mut F, array: &Array
     Ok(())
 }
 
-fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<A, D>) -> Result<(), WriteError> {
+fn write_data<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
     let data_ptr = array.as_ptr();
     let byte_length = array.len() * size_of::<A>();
     if cfg!(endianness = "little") {
@@ -126,15 +132,23 @@ fn write_data<F: Write, A: WriteSane, D: Dimension>(file: &mut F, array: &Array<
 }
 
 /// Write array into a SANE-encoded file
-pub fn write_sane<F: Write, A: WriteSane, D: Dimension>(mut file: F, array: &Array<A, D>) -> Result<(), WriteError> {
+pub fn write_sane<F: Write, A: WriteSane, D: Dimension, Repr>(mut file: F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
+where
+    Repr: Data<Elem = A>
+{
     write_header(&mut file, &array)?;
     write_data(&mut file, &array)?;
     Ok(())
 }
 
-pub fn write_sane_arrays<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays>(mut file: F, arrays: Arrays) -> Result<(), WriteError>
+/// Write multiple SANE-encoded arrays to a file
+pub fn write_sane_arrays<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays, Repr>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), WriteError>
 where
-    Arrays: IntoIterator<Item = &'a Array<A,D>>
+    Repr: Data<Elem = A> + 'a,
+    Arrays: IntoIterator<Item = &'a ArrayBase<Repr,D>>
 {
     for array in arrays.into_iter() {
         write_header(&mut file, &array)?;

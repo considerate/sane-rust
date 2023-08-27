@@ -141,6 +141,14 @@ where
     Ok(())
 }
 
+/// Write array into SANE-encoded file, returning [`std::io::Error`]s
+pub fn write_sane_io<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), std::io::Error>
+where
+    Repr: Data<Elem = A>
+{
+    write_sane(file, array).map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+}
+
 /// Write multiple SANE-encoded arrays to a file
 pub fn write_sane_arrays<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays, Repr>(
     mut file: F,
@@ -151,8 +159,22 @@ where
     Arrays: IntoIterator<Item = &'a ArrayBase<Repr,D>>
 {
     for array in arrays.into_iter() {
-        write_header(&mut file, &array)?;
-        write_data(&mut file, &array)?;
+        write_sane(&mut file, array)?;
+    }
+    Ok(())
+}
+
+/// Write multiple SANE-encoded arrays to a file, returning [`std::io::Error`]s
+pub fn write_sane_arrays_io<'a, F: Write, A: WriteSane + 'a, D: Dimension + 'a, Arrays, Repr>(
+    mut file: F,
+    arrays: Arrays,
+) -> Result<(), std::io::Error>
+where
+    Repr: Data<Elem = A> + 'a,
+    Arrays: IntoIterator<Item = &'a ArrayBase<Repr,D>>
+{
+    for array in arrays.into_iter() {
+        write_sane_io(&mut file, array)?;
     }
     Ok(())
 }

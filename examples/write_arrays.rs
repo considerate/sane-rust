@@ -1,8 +1,8 @@
 use std::fs::File;
-use sane_array::{write_sane, WriteSane};
+use sane_array::{write_sane_io, WriteSane};
 use ndarray::{self, Dimension};
 use ndarray::array;
-use std::io::{Error, ErrorKind};
+use std::io::{Error};
 
 fn with_file<A, F>(path: &str, f: F) -> Result<A, Error>
 where

@@ -6,9 +6,9 @@ pub mod write;
 pub mod read;
 pub mod data;
 
-pub use crate::read::{read_sane, read_sane_dyn, ReadSane};
-pub use crate::write::{write_sane, WriteSane};
-pub use crate::data::SaneData;
+pub use crate::read::{read_sane, read_sane_dyn, read_sane_arrays, ReadSane};
+pub use crate::write::{write_sane, write_sane_io, write_sane_arrays, write_sane_arrays_io, WriteSane};
+pub use crate::data::{SaneData, Sane};
 
 
 #[cfg(test)]

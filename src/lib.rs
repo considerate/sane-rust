@@ -2,9 +2,9 @@
 //!
 //! This is an implementation of the Simple Array of Numbers Encoding (SANE) specification at:
 //! <https://github.com/considerate/sane>
-mod write;
-mod read;
-mod data;
+pub mod write;
+pub mod read;
+pub mod data;
 
 pub use crate::read::{read_sane, read_sane_dyn, ReadSane};
 pub use crate::write::{write_sane, WriteSane};

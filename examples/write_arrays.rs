@@ -12,8 +12,8 @@ where
 }
 
 fn write_sane_file<A: WriteSane, D: Dimension>(path: &str, arr: ndarray::Array<A, D>)  -> Result<(), Error> {
-    with_file(path, |file| {
-        write_sane(file, &arr).map_err(|e| Error::new(ErrorKind::Other, e))
+    with_file(path, |mut file| {
+        write_sane_io(&mut file, &arr)
     })
 }
 

@@ -132,12 +132,12 @@ where
 }
 
 /// Write array into a SANE-encoded file
-pub fn write_sane<F: Write, A: WriteSane, D: Dimension, Repr>(mut file: F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
+pub fn write_sane<F: Write, A: WriteSane, D: Dimension, Repr>(file: &mut F, array: &ArrayBase<Repr, D>) -> Result<(), WriteError>
 where
     Repr: Data<Elem = A>
 {
-    write_header(&mut file, &array)?;
-    write_data(&mut file, &array)?;
+    write_header(file, &array)?;
+    write_data(file, &array)?;
     Ok(())
 }
 
